@@ -1,0 +1,27 @@
+# FIM preprocessing configuration
+preprocess:
+  workspace_path: null  # null: current working directory
+  model_name: "unsloth/Qwen2.5-Coder-3B"  # tokenizer repository or local path
+  fim_prefix_token: "<|fim_prefix|>"
+  fim_middle_token: "<|fim_middle|>"
+  fim_suffix_token: "<|fim_suffix|>"
+  fim_pad_token: "<|fim_pad|>"
+  eos_token: "<|endoftext|>"
+  max_token_sequence_length: 1024
+  data_language: "c"
+  data_extensions: [".c", ".h"]
+  split_mode: "auto"
+  train_ratio: 0.8
+  eval_ratio: 0.1
+  test_ratio: 0.1
+  max_code_blocks_ast_depth: 4
+  min_middle_tokens_length: 8
+  max_middle_tokens_length: 128
+  fim_examples_per_subblock_ratio: 1.0
+  rand_to_ast_fim_examples_ratio: 0.0
+  rand_examples_min_prefix_suffix_tokens_length: 8
+  tokenizer_batch_size: 32
+  raw_data_path: null  # null: <workspace_path>/data
+  tree_sitter_parser_path: null  # null: tree-sitter language pack
+  tree_sitter_definitions_path: null  # null: bundled definitions
+  rng_seed: 0

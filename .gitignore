@@ -1,0 +1,38 @@
+# Local input repositories and generated datasets (audit files can contain full source).
+/generator/generator-codebases/
+/generator/generator-results/*
+!/generator/generator-results/test/
+/generator/generator-results/test/*
+!/generator/generator-results/test/generate_sample.py
+
+# Python environments, caches and build products.
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+/build/
+/dist/
+
+# Local dependency and compiler output directories.
+node_modules/
+target/
+
+# Local environment configuration. Keep shareable templates.
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Editor / OS scratch files.
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

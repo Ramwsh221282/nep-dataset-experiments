@@ -1,0 +1,370 @@
+import json
+import logging
+from pathlib import Path
+from typing import Iterator, List, Mapping, Tuple
+
+from transformers import AutoTokenizer
+import tree_sitter as ts
+
+from .config import Config
+from .extract import auto_create_split_paths, get_code_blocks_from_paths
+
+
+logger = logging.getLogger(__name__)
+
+
+def estimate_bytes_per_token_ratio(config: Config, tokenizer: AutoTokenizer, number_of_code_blocks: int) -> float:
+    """
+    Estimate bytes per token ratio from first `number_of_code_blocks` code blocks in training split.
+    Always uses auto-split (ignores config.split_mode). 
+    Source code is almost entirely ASCII characters (1 char = 1 byte) 
+    except e.g. specific string literals (printf("π ≈ 3.14159\n");). 
+    ASCII is a subset of UTF-8, so len(bytes) ≈ character count.
+    """
+    train_file_paths, _, _ = auto_create_split_paths(config)  # no matter the split mode always use the auto split
+    total_bytes = 0
+    total_tokens = 0
+    i = 0
+    block_iter = get_code_blocks_from_paths(config, train_file_paths)
+    for block in block_iter:
+        total_bytes += len(block[0])  # bytes from code block
+        tokenized_block = tokenizer(block[0].decode('utf-8')).tokens()
+        total_tokens += len(tokenized_block)
+        i += 1
+        if i >= number_of_code_blocks:
+            break
+    
+    if total_tokens <= 0 or total_bytes <= 0:
+        raise ValueError("Failed to estimate bytes per token ratio")
+    bytes_per_token_ratio = total_bytes / total_tokens 
+    return bytes_per_token_ratio
+
+
+def _extract_subblock_ranges(config: Config, node: ts.Node, base_offset: int) -> list[Tuple[int, int]]:
+    """
+    Recursively depth-first search (DFS) the Abstract syntax tree (AST) and collect all subblock indices.
+    Returns subblock ranges relative to the containing code block.
+    E.g., a subblock range of (2, 30) means the subblock starts at byte position 2
+    and ends at byte position 30, counting from the beginning of the specific code block
+    (not the file).
+    """
+    subblock_ranges = []
+
+    if node.type in config.tree_sitter_subblock_types:
+        relative_start_byte = node.start_byte - base_offset
+        relative_end_byte = node.end_byte - base_offset
+        subblock_ranges.append((relative_start_byte, relative_end_byte))
+    for child in node.children:
+        child_subblock_ranges = _extract_subblock_ranges(config, child, base_offset) 
+        subblock_ranges.extend(child_subblock_ranges)
+        
+    return subblock_ranges
+
+
+def _filter_subblocks(subblock_ranges: list[Tuple[int, int]], max_bytes_per_subblock: int) -> list[Tuple[int, int]]:
+    """
+     Discard subblocks that have a larger end index than max_bytes_per_subblock.
+    """
+    subblock_ranges = sorted(subblock_ranges, key=lambda x: x[1])  # sort ranges by end index
+    i = 0
+    while i < len(subblock_ranges) and subblock_ranges[i][1] <= max_bytes_per_subblock:
+        i += 1
+    return subblock_ranges[:i]
+
+
+def _generate_fim_examples_from_code_block(config: Config, code_utf8: bytes, subblock_ranges: list[Tuple[int, int]], bytes_per_token_ratio: float) -> list[bytes]:
+    fim_prefix_token_utf8 = config.fim_prefix_token.encode('utf8')
+    fim_middle_token_utf8 = config.fim_middle_token.encode('utf8')
+    fim_suffix_token_utf8 = config.fim_suffix_token.encode('utf8')
+    eos_token_utf8 = config.eos_token.encode('utf8')
+    
+    num_of_subblocks = len(subblock_ranges)
+    if num_of_subblocks == 0:
+        return []
+    num_of_fim_examples = max(1, int(num_of_subblocks * config.fim_examples_per_subblock_ratio))  
+    unique_random_subblock_indices = config.rng.choice(len(subblock_ranges), size=num_of_fim_examples, replace=False)
+
+    fim_examples = [] 
+
+    for idx in unique_random_subblock_indices:
+        middle_start_byte = subblock_ranges[idx][0]
+        middle_end_byte = subblock_ranges[idx][1]
+        middle_bytes_length = middle_end_byte - middle_start_byte
+        middle_tokens_length = middle_bytes_length / bytes_per_token_ratio
+        # allow only examples within a certain range
+        if (middle_tokens_length < config.min_middle_tokens_length) or (middle_tokens_length > config.max_middle_tokens_length):
+            continue
+
+        prefix = code_utf8[:middle_start_byte]
+        middle = code_utf8[middle_start_byte:middle_end_byte]
+        suffix = code_utf8[middle_end_byte:]
+
+        fim_example = (
+            fim_prefix_token_utf8 + prefix +
+            fim_suffix_token_utf8 + suffix +
+            fim_middle_token_utf8 + middle +
+            eos_token_utf8
+        )
+
+        fim_examples.append(fim_example)
+
+    return fim_examples
+
+
+def create_fim_examples(config: Config, code_blocks_iter: Iterator[Tuple[bytes, ts.Node]], bytes_per_token_ratio: float) -> Iterator[bytes]:
+    """
+    Generator function that takes a generator iterator of code blocks as input, 
+    generates FIM examples from each code block and returns a generator iterator 
+    over all created FIM examples. 
+    """
+    for code_block_utf8, node in code_blocks_iter:
+        base_offset = node.start_byte
+        subblock_ranges = _extract_subblock_ranges(config, node, base_offset)
+        
+        if not subblock_ranges:
+            continue 
+
+        max_bytes_per_subblock = int(config.max_token_sequence_length * bytes_per_token_ratio)
+
+        subblock_ranges = _filter_subblocks(subblock_ranges, max_bytes_per_subblock) 
+        
+        fim_examples = _generate_fim_examples_from_code_block(config, code_block_utf8, subblock_ranges, bytes_per_token_ratio)
+        for fim_example in fim_examples:
+            yield fim_example
+
+
+def _filter_tokenized_total_length(config: Config, tokenized_batch: Mapping[str, List[List[int]]]) -> Mapping[str, List[List[int]]]:
+    """
+    Remove examples whose actual token count exceeds max_length.
+    Returns filtered batch.
+    """
+    input_ids = tokenized_batch["input_ids"]
+    max_length = config.max_token_sequence_length
+    
+    keep_indices = []
+    for idx, token_sequence in enumerate(input_ids):
+        if len(token_sequence) <= max_length:
+            keep_indices.append(idx)
+    
+    filtered_batch = {}
+    for key, values in tokenized_batch.items():
+        filtered_values = []
+        for idx in keep_indices:
+            filtered_values.append(values[idx])
+        filtered_batch[key] = filtered_values
+    
+    return filtered_batch 
+
+
+def _filter_tokenized_middle_length(config: Config, tokenizer: AutoTokenizer, tokenized_batch: Mapping[str, List[List[int]]]) -> Mapping[str, List[List[int]]]:
+    """
+    Removes examples whose actual token middle cont is smaller or larger than the defined range
+    Returns filtered batch
+    """
+    input_ids = tokenized_batch["input_ids"]
+    fim_middle_token_id = tokenizer.convert_tokens_to_ids(config.fim_middle_token)
+
+    keep_indices = []
+    for ex_idx, ex_token_sequence in enumerate(input_ids):
+        try:
+            fim_middle_token_idx = ex_token_sequence.index(fim_middle_token_id)
+            middle_length = len(ex_token_sequence) - fim_middle_token_idx - 2  # -2 accounts for the fim_middle token and eos token 
+            
+            if config.min_middle_tokens_length <= middle_length <= config.max_middle_tokens_length:
+                keep_indices.append(ex_idx)
+        except ValueError:
+            logger.warning(f"Failed to filter example at index {ex_idx}: FIM middle token ID {fim_middle_token_id} not found in sequence.")
+            continue
+
+    filtered_batch = {}
+    for key, values in tokenized_batch.items():
+        filtered_values = []
+        for idx in keep_indices:
+            filtered_values.append(values[idx])
+        filtered_batch[key] = filtered_values
+    
+    return filtered_batch 
+        
+
+def _save_tokenized_batch_as_jsonl(file_path: Path, batch: Mapping[str, List[List[int]]]) -> None:
+    with open(file_path, 'a', encoding='utf-8') as f:
+        batch_size = len(batch['input_ids'])
+        for i in range(batch_size):
+            input_ids = batch['input_ids'][i]
+            attention_mask = batch['attention_mask'][i]
+            labels = batch['labels'][i]
+            
+            example = {
+                'input_ids': input_ids,
+                'attention_mask': attention_mask,
+                'labels': labels
+            }
+            f.write(json.dumps(example, ensure_ascii=False) + '\n')  # ensre utf8 encoding
+
+
+def tokenize_filter_and_save(config: Config, file_path: Path, fim_examples_iter: Iterator[bytes], tokenizer: AutoTokenizer) -> None: 
+    examples_counter = 0
+    batch = []
+    for fim_example in fim_examples_iter:
+        batch.append(fim_example.decode('utf-8'))
+        if (len(batch) == config.tokenizer_batch_size):
+            tokenized_batch = tokenizer(
+                batch,
+                padding=False,
+                return_tensors=None,
+                return_attention_mask=True
+            )
+            tokenized_batch["labels"] = tokenized_batch["input_ids"]
+            filtered_tokenized_batch = _filter_tokenized_total_length(config, tokenized_batch)
+            filtered_tokenized_batch = _filter_tokenized_middle_length(config, tokenizer, filtered_tokenized_batch)
+            if filtered_tokenized_batch["input_ids"]:  # dont save if no examples left after filtering
+                _save_tokenized_batch_as_jsonl(file_path, filtered_tokenized_batch)
+            examples_counter += len(filtered_tokenized_batch["input_ids"])
+            batch = []
+
+    # last batch is smaller than config.tokenizer_batch_size, the "rest"
+    if batch:
+        tokenized_batch = tokenizer(
+            batch,
+            padding=False,
+            return_tensors=None,
+            return_attention_mask=True
+        )
+        tokenized_batch["labels"] = tokenized_batch["input_ids"]
+        filtered_tokenized_batch = _filter_tokenized_total_length(config, tokenized_batch)
+        filtered_tokenized_batch = _filter_tokenized_middle_length(config, tokenizer, filtered_tokenized_batch)
+        if filtered_tokenized_batch["input_ids"]:  # dont save if no examples left after filtering
+            _save_tokenized_batch_as_jsonl(file_path, filtered_tokenized_batch)
+        examples_counter += len(filtered_tokenized_batch["input_ids"])
+
+    logger.info(f"Processed and saved {examples_counter} ast FIM examples to {file_path}")
+
+    return examples_counter
+
+
+def _align_to_char_boundary(data: bytes, index: int) -> int:
+    """
+    Move index forward to the next UTF-8 character start.
+
+    UTF-8 continuation bytes always match 0b10xxxxxx (0x80-0xBF); any other
+    byte starts a new character. Snapping the chunk boundary forward keeps
+    multi-byte characters (e.g. '°' in clay_renderer_cairo.c) intact, so the
+    resulting chunk is always valid UTF-8.
+    """
+    while index < len(data) and (data[index] & 0xC0) == 0x80:
+        index += 1
+    return index
+
+
+def _get_chunks_from_paths(config: Config, file_paths: list[Path], bytes_per_token_ratio: float) -> Iterator[bytes]:
+    safety_factor = 1.2  # safety factor to ensure that chunks are long enough after tokenization and meet max_token_sequence_length because bytes_per_token_ratio is only an estimated value
+    chunk_size_bytes = int(config.max_token_sequence_length * bytes_per_token_ratio * safety_factor)
+
+    for path in file_paths:
+        if not path.is_file():   
+            continue
+        try:
+            source_code_unicode = path.read_text(encoding='utf8')
+        except UnicodeDecodeError:
+            logger.warning(f"Skipping file '{path}': Not a valid UTF-8 file.")
+            continue
+
+        source_code_utf8 = source_code_unicode.encode('utf8')
+        file_len = len(source_code_utf8)
+
+        # files containing less code than than chunk_size_bytes 
+        if file_len <= chunk_size_bytes:
+            yield source_code_utf8
+            continue
+
+        # non overlapping sliding window, snapped to UTF-8 character boundaries
+        start = 0
+        while start < file_len:
+            end = _align_to_char_boundary(source_code_utf8, min(start + chunk_size_bytes, file_len))
+            yield source_code_utf8[start:end]
+            start = end
+
+
+def _generate_random_fim_examples(
+    config: Config, 
+    tokenizer: AutoTokenizer, 
+    chunk_tokenized: List[int], 
+) -> List[List[int]]:
+    fim_prefix_id = tokenizer.convert_tokens_to_ids(config.fim_prefix_token)
+    fim_suffix_id = tokenizer.convert_tokens_to_ids(config.fim_suffix_token)
+    fim_middle_id = tokenizer.convert_tokens_to_ids(config.fim_middle_token)
+    eos_id = tokenizer.convert_tokens_to_ids(config.eos_token)
+
+    random_fim_examples = []
+
+    num_of_examples = config.rand_examples_per_chunk
+    for i in range(0, num_of_examples):
+        random_mid_length = config.rng.integers(config.min_middle_tokens_length, config.max_middle_tokens_length + 1)
+
+        # ensure the chunk is large enough for the middle section plus minimum prefix and suffix length 
+        if random_mid_length > (len(chunk_tokenized) - 2*config.rand_examples_min_prefix_suffix_tokens_length):
+            continue
+
+        max_start_idx = len(chunk_tokenized) - random_mid_length - config.rand_examples_min_prefix_suffix_tokens_length
+        mid_start_idx = config.rng.integers(config.rand_examples_min_prefix_suffix_tokens_length, max_start_idx + 1)
+        mid_end_idx = mid_start_idx + random_mid_length
+
+        prefix_ids = chunk_tokenized[:mid_start_idx]
+        suffix_ids = chunk_tokenized[mid_end_idx:]
+        middle_ids = chunk_tokenized[mid_start_idx:mid_end_idx]
+
+        fim_example = [fim_prefix_id] + prefix_ids + [fim_suffix_id] + suffix_ids + [fim_middle_id] + middle_ids + [eos_id]
+
+        random_fim_examples.append(fim_example)
+
+    return random_fim_examples
+
+
+def augment_with_random_fim_examples(
+    config: Config,
+    tokenizer: AutoTokenizer,
+    file_paths: list[Path],
+    bytes_per_token_ratio: float,
+    num_examples: int,
+    save_path,
+) -> None:
+    num_of_special_tokens = len([config.fim_prefix_token, config.fim_middle_token, config.fim_suffix_token, config.eos_token])
+    chunk_bytes_iter = _get_chunks_from_paths(config, file_paths, bytes_per_token_ratio)
+    random_fim_examples_pool = []
+
+    batch = []
+    for fim_example in chunk_bytes_iter:
+        batch.append(fim_example.decode('utf-8'))
+        if (len(batch) == config.tokenizer_batch_size):
+            chunk_tokenized_batch = tokenizer(
+                batch,
+                padding=False,
+                return_tensors=None,
+                return_attention_mask=True
+            )
+            chunk_tokenized_batch["labels"] = chunk_tokenized_batch["input_ids"]
+
+            for chunk_tokenized in chunk_tokenized_batch["input_ids"]:
+                chunk_tokenized = chunk_tokenized[: (config.max_token_sequence_length - num_of_special_tokens)]  # truncate 
+                random_fim_examples = _generate_random_fim_examples(config, tokenizer, chunk_tokenized)
+                random_fim_examples_pool.extend(random_fim_examples)
+            batch = []
+
+    if batch:
+        chunk_tokenized_batch = tokenizer(batch, padding=False, return_tensors=None, return_attention_mask=True)
+        for chunk_tokenized in chunk_tokenized_batch["input_ids"]:
+            chunk_tokenized = chunk_tokenized[: (config.max_token_sequence_length - num_of_special_tokens)]  # truncate
+            random_fim_examples = _generate_random_fim_examples(config, tokenizer, chunk_tokenized)
+            random_fim_examples_pool.extend(random_fim_examples)
+
+    config.rng.shuffle(random_fim_examples_pool)
+    random_fim_examples_pool = random_fim_examples_pool[:num_examples]
+
+    formatted_batch = {
+        "input_ids": random_fim_examples_pool,
+        "attention_mask": [[1] * len(ex) for ex in random_fim_examples_pool],
+        "labels": random_fim_examples_pool,
+    }
+    _save_tokenized_batch_as_jsonl(save_path, formatted_batch)
+
+    logger.info(f"Processed and saved {len(formatted_batch["input_ids"])} random FIM examples to {save_path}")

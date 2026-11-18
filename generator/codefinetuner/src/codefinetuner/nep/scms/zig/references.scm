@@ -1,0 +1,2 @@
+(IDENTIFIER) @reference
+(STRINGLITERALSINGLE) @document

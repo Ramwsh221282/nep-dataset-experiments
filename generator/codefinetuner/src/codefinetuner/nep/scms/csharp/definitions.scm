@@ -1,0 +1,9 @@
+(method_declaration) @definition
+(constructor_declaration) @definition
+(class_declaration) @definition
+(interface_declaration) @definition
+(record_declaration) @definition
+(variable_declarator) @definition
+(parameter) @definition
+(field_declaration) @definition
+(declaration) @definition

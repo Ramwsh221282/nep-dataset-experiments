@@ -1,0 +1,320 @@
+{
+  "c": {
+    "block_types": [
+      "function_definition",
+      "type_definition",
+      "enum_specifier"
+    ],
+    "subblock_types": [
+      "compound_statement",
+      "parameter_declaration",
+      "declaration",
+      "expression_statement",
+      "if_statement",
+      "while_statement",
+      "for_statement",
+      "do_statement",
+      "switch_statement",
+      "case_statement",
+      "return_statement",
+      "field_declaration",
+      "enumerator",
+      "initializer_pair",
+      "preproc_def",
+      "preproc_function_def"
+    ]
+  },
+  "cpp": {
+    "block_types": [
+      "function_definition",
+      "class_specifier",
+      "struct_specifier",
+      "union_specifier",
+      "enum_specifier"
+    ],
+    "subblock_types": [
+      "compound_statement",
+      "parameter_declaration",
+      "declaration",
+      "expression_statement",
+      "if_statement",
+      "while_statement",
+      "for_statement",
+      "for_range_loop",
+      "switch_statement",
+      "case_statement",
+      "return_statement",
+      "field_declaration",
+      "enumerator",
+      "try_statement",
+      "catch_clause"
+    ]
+  }, 
+  "python": {
+    "block_types": [
+      "class_definition",
+      "function_definition"
+    ],
+    "subblock_types": [
+      "assignment",
+      "augmented_assignment",
+      "typed_parameter",
+      "default_parameter",
+      "typed_default_parameter",
+      "if_statement",
+      "elif_clause",
+      "else_clause",
+      "while_statement",
+      "for_statement",
+      "match_statement",
+      "case_clause",
+      "return_statement",
+      "try_statement",
+      "except_clause",
+      "finally_clause",
+      "with_statement",
+      "decorated_definition",
+      "lambda"
+    ]
+  },
+  "java": {
+    "block_types": [
+      "method_declaration",
+      "constructor_declaration",
+      "enum_declaration",
+      "record_declaration"
+    ],
+    "subblock_types": [
+      "formal_parameter",
+      "field_declaration",
+      "local_variable_declaration",
+      "expression_statement",
+      "if_statement",
+      "while_statement",
+      "for_statement",
+      "enhanced_for_statement",
+      "switch_expression",
+      "switch_rule",
+      "switch_label",
+      "return_statement",
+      "throw_statement",
+      "catch_clause",
+      "finally_clause",
+      "yield_statement",
+      "try_statement",
+      "try_with_resources_statement",
+      "synchronized_statement",
+      "enum_constant"
+    ]
+  },
+  "rust": {
+    "block_types": [
+      "function_item",
+      "struct_item",
+      "enum_item"
+    ],
+    "subblock_types": [
+      "parameter",
+      "let_declaration",
+      "if_expression",
+      "while_expression",
+      "for_expression",
+      "loop_expression",
+      "match_expression",
+      "match_arm",
+      "return_expression",
+      "field_declaration",
+      "enum_variant",
+      "compound_assignment_expr"
+    ]
+  },
+  "javascript": {
+    "block_types": [
+      "function_declaration",
+      "generator_function_declaration",
+      "class_declaration"
+    ],
+    "subblock_types": [
+      "formal_parameters",
+      "lexical_declaration",
+      "variable_declaration",
+      "expression_statement",
+      "assignment_expression",
+      "augmented_assignment_expression",
+      "if_statement",
+      "else_clause",
+      "while_statement",
+      "for_statement",
+      "for_in_statement",
+      "switch_statement",
+      "switch_case",
+      "return_statement",
+      "try_statement",
+      "catch_clause",
+      "method_definition",
+      "field_definition"
+    ]
+  },
+  "go": {
+    "block_types": [
+      "function_declaration",
+      "method_declaration",
+      "type_declaration"
+    ],
+    "subblock_types": [
+      "parameter_declaration",
+      "field_declaration",
+      "method_elem",
+      "var_declaration",
+      "const_declaration",
+      "short_var_declaration",
+      "assignment_statement",
+      "inc_statement",
+      "expression_statement",
+      "if_statement",
+      "for_statement",
+      "expression_switch_statement",
+      "expression_case",
+      "select_statement",
+      "communication_case",
+      "go_statement",
+      "defer_statement",
+      "return_statement"
+    ]
+  },
+  "swift": {
+    "block_types": [
+      "class_declaration",
+      "protocol_declaration",
+      "function_declaration"
+    ],
+    "subblock_types": [
+      "property_declaration",
+      "parameter",
+      "assignment",
+      "if_statement",
+      "while_statement",
+      "for_statement",
+      "switch_statement",
+      "switch_entry",
+      "guard_statement",
+      "do_statement",
+      "catch_block",
+      "control_transfer_statement",
+      "computed_property",
+      "init_declaration",
+      "enum_entry"
+    ]
+  },
+  "bash": {
+    "block_types": [
+      "function_definition"
+    ],
+    "subblock_types": [
+      "command",
+      "variable_assignment",
+      "declaration_command",
+      "redirected_statement",
+      "test_command",
+      "command_substitution",
+      "if_statement",
+      "elif_clause",
+      "else_clause",
+      "while_statement",
+      "for_statement",
+      "case_statement",
+      "case_item"
+    ]
+  },
+  "systemverilog": {
+    "block_types": [
+      "module_declaration",
+      "package_declaration",
+      "interface_declaration",
+      "program_declaration"
+    ],
+    "subblock_types": [
+      "ansi_port_declaration",
+      "tf_port_item",
+      "parameter_declaration",
+      "local_parameter_declaration",
+      "data_declaration",
+      "net_declaration",
+      "struct_union_member",
+      "enum_name_declaration",
+      "continuous_assign",
+      "blocking_assignment",
+      "nonblocking_assignment",
+      "conditional_statement",
+      "case_statement",
+      "case_item",
+      "loop_statement",
+      "jump_statement",
+      "subroutine_call_statement",
+      "simple_immediate_assert_statement",
+      "module_instantiation",
+      "loop_generate_construct",
+      "if_generate_construct"
+    ]
+  },
+  "vhdl": {
+    "block_types": [
+      "entity_declaration",
+      "architecture_body",
+      "package_declaration",
+      "package_body"
+    ],
+    "subblock_types": [
+      "signal_declaration",
+      "constant_declaration",
+      "variable_declaration",
+      "full_type_declaration",
+      "signal_interface_declaration",
+      "constant_interface_declaration",
+      "simple_waveform_assignment",
+      "simple_variable_assignment",
+      "simple_concurrent_signal_assignment",
+      "if_statement",
+      "case_statement",
+      "case_statement_alternative",
+      "loop_statement",
+      "for_loop",
+      "while_loop",
+      "return_statement",
+      "for_generate_statement",
+      "if_generate_statement",
+      "component_instantiation_statement"
+    ]
+  }, 
+  "iec61131_3_st": {
+    "block_types": [
+      "function_block_declaration",
+      "function_declaration",
+      "program_declaration",
+      "method_declaration",
+      "structure_type_inline",
+      "enumerated_type_inline"
+    ],
+    "subblock_types": [
+      "var_block",
+      "var_input",
+      "var_output",
+      "var_in_out",
+      "var_temp",
+      "var_external",
+      "variable_declaration",
+      "assignment_statement",
+      "invocation_statement",
+      "if_statement",
+      "case_statement",
+      "case_clause",
+      "for_statement",
+      "while_statement",
+      "repeat_statement",
+      "return_statement",
+      "exit_statement",
+      "structure_field",
+      "enumerator"
+    ]
+  }
+}

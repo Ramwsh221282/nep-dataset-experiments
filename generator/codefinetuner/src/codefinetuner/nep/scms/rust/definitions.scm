@@ -1,0 +1,13 @@
+(function_item) @definition
+(function_signature_item) @definition
+(struct_item) @definition
+(enum_item) @definition
+(union_item) @definition
+(trait_item) @definition
+(type_item) @definition
+(let_declaration) @definition
+(parameter) @definition
+(field_declaration) @definition
+(const_item) @definition
+(static_item) @definition
+(ERROR) @definition

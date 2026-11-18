@@ -1,0 +1,15 @@
+(function_declaration) @definition
+(method_definition) @definition
+(class_declaration) @definition
+(interface_declaration) @definition
+(variable_declarator) @definition
+(required_parameter) @definition
+(optional_parameter) @definition
+(declaration) @definition
+(public_field_definition) @definition
+(type_alias_declaration) @definition
+(lexical_declaration) @definition
+(ERROR) @definition
+(function_expression) @definition
+(generator_function) @definition
+(generator_function_declaration) @definition

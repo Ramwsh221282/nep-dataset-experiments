@@ -1,0 +1,7 @@
+# Dataset-only environment. Does not install the training stack.
+# Bindings are pinned for tree-sitter 0.22 ABI compatibility.
+tree-sitter==0.22.3
+tree-sitter-language-pack==0.2.0
+tree-sitter-typescript==0.21.2
+tree-sitter-c-sharp==0.21.3
+json5==0.12.1

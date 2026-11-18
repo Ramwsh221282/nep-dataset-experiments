@@ -1,0 +1,45 @@
+# Version Control & Docker
+.git/
+.gitignore
+Dockerfile*
+.dockerignore
+
+# Environments & Secrets
+.env
+.venv/
+.venv-nep/
+env/
+venv/
+
+# Python Cache & Build Artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# IDE & OS Junk
+.vscode/
+.idea/
+.DS_Store
+
+# Documentation & Tests
+tests/
+testing/
+LICENSE.txt
+TODO.md
+
+# Datasets & Outputs
+data/
+datasets/
+
+outputs/
+results/
+
+third_party/
+jupyter_nb/
+*.jsonl

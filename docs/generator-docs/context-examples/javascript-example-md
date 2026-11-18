@@ -1,0 +1,45 @@
+# JavaScript без JSX
+
+## Исходный код
+
+```js
+export const DEFAULT_LIMIT = 25;
+export let resultLimit = DEFAULT_LIMIT;
+
+export function findById(items, id) {
+  return items.find((item) => item.id === id);
+}
+
+export class UsersRepository {
+  #users = [];
+
+  constructor(users = []) {
+    this.#users = users;
+  }
+
+  getUser(id) {
+    return findById(this.#users, id);
+  }
+}
+
+export const formatUser = (user) => user.name.trim();
+```
+
+## Обработанный контекст
+
+```text
+<|file_sep|>src/users.js
+export const DEFAULT_LIMIT = 25;
+export let resultLimit = DEFAULT_LIMIT;
+
+export function findById(items, id);
+
+export class UsersRepository {
+  #users = [];
+
+  constructor(users = []);
+  getUser(id);
+}
+
+export const formatUser = (user) => {/* тело функции опущено */};
+```

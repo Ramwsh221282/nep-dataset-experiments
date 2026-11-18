@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs", "hatch-fancy-pypi-readme"]  # hatch-vcs used to sync versioning with latest git tag number 
+build-backend = "hatchling.build"
+
+[project]
+name = "codefinetuner"
+dynamic = ["version", "readme"]
+description = "AST-based FIM preprocessing, tokenization and Next Edit Prediction dataset generation"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
+authors = [
+    { name = "cuolm", email = "cuolm.approach717@passinbox.com" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Typing :: Typed",
+]
+dependencies = [
+    "json5==0.12.1",
+
+    "numpy>=2.3.4",
+    "transformers>=4.57.1,<5",
+    "tree-sitter==0.22.3",
+    "tree-sitter-language-pack==0.2.0",
+    "tree-sitter-typescript==0.21.2",
+    "tree-sitter-c-sharp==0.21.3",
+    "omegaconf>=2.3.0",
+    "sentencepiece>=0.2.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-mock>=3.15.1",
+]
+
+[project.scripts]
+codefinetuner-nep = "codefinetuner.nep.__main__:main"
+codefinetuner = "codefinetuner.pipeline:main"  
+
+[project.urls]
+Homepage = "https://github.com/cuolm/codefinetuner"
+Repository = "https://github.com/cuolm/codefinetuner.git"
+Issues = "https://github.com/cuolm/codefinetuner/issues"
+
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]  # add src to sys.path when pytest runs
+testpaths = ["tests"]  # make pytest only discover tests under tests/
+addopts = "--import-mode=importlib --ignore=third_party"  # importlib-based importing for test modules, avoid third_party module tests
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+# RULE 1: markdown images ![alt](docs/...) -> raw GitHub content
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '!\[(?P<alt>.*?)\]\((?!https?://)(?:\./|/)?docs/(?P<path>.+?)\)'
+replacement = '![\g<alt>](https://raw.githubusercontent.com/cuolm/codefinetuner/master/docs/\g<path>)'
+
+# RULE 2: relative [text](path) links -> GitHub tree view.
+# (?<!!) excludes image syntax, so this cannot overlap with RULE 1.
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?<!!)\[(?P<text>.+?)\]\((?P<path>(?!https?://)\S+?)\)'
+replacement = '[\g<text>](https://github.com/cuolm/codefinetuner/tree/master\g<path>)'
+
+# RULE 3: HTML <img src="docs/..."> -> raw GitHub content
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = 'src="(?:\./|/)?docs/(?P<path>[^"]+)"'
+replacement = 'src="https://raw.githubusercontent.com/cuolm/codefinetuner/master/docs/\g<path>"'
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codefinetuner"]

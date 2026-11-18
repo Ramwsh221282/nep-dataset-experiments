@@ -1,0 +1,2 @@
+(identifier) @reference
+(string) @document
